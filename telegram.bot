@@ -1,0 +1,72 @@
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
+
+# Define available papers
+question_papers = {
+    "class_11": {
+        "Math": "path_or_url_to_class_11_math_paper.pdf",
+        "Physics": "path_or_url_to_class_11_physics_paper.pdf",
+        "Chemistry": "path_or_url_to_class_11_chemistry_paper.pdf",
+    },
+    "class_12": {
+        "Math": "path_or_url_to_class_12_math_paper.pdf",
+        "Physics": "path_or_url_to_class_12_physics_paper.pdf",
+        "Chemistry": "path_or_url_to_class_12_chemistry_paper.pdf",
+    }
+}
+
+def start(update: Update, context: CallbackContext):
+    """Handle /start command"""
+    keyboard = [
+        [InlineKeyboardButton("Class 11", callback_data="class_11"),
+         InlineKeyboardButton("Class 12", callback_data="class_12")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    update.message.reply_text("Welcome! Choose your class:", reply_markup=reply_markup)
+
+def handle_class_selection(update: Update, context: CallbackContext):
+    """Handle class selection"""
+    query = update.callback_query
+    query.answer()
+
+    selected_class = query.data
+    papers = question_papers[selected_class]
+
+    keyboard = [
+        [InlineKeyboardButton(subject, callback_data=f"{selected_class}:{subject}")]
+        for subject in papers
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    query.edit_message_text(text="Select a subject:", reply_markup=reply_markup)
+
+def handle_subject_selection(update: Update, context: CallbackContext):
+    """Handle subject selection and send the paper"""
+    query = update.callback_query
+    query.answer()
+
+    selected_class, subject = query.data.split(":")
+    paper_path = question_papers[selected_class][subject]
+
+    if paper_path.startswith("http"):
+        # Send as a link
+        query.edit_message_text(text=f"Here is your {subject} paper: {paper_path}")
+    else:
+        # Send as a file
+        context.bot.send_document(chat_id=query.message.chat_id, document=open(paper_path, "rb"))
+
+def main():
+    """Start the bot"""
+    # Replace '8161743347:AAE0GCz3uD3QGIWD_470dw4pwNtWe9-jL7g' with your bot's token
+    updater = Updater("YOUR_BOT_TOKEN")
+
+    updater.dispatcher.add_handler(CommandHandler("start", start))
+    updater.dispatcher.add_handler(CallbackQueryHandler(handle_class_selection, pattern="^class_"))
+    updater.dispatcher.add_handler(CallbackQueryHandler(handle_subject_selection, pattern="^class_\d+:"))
+
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == "__main__":
+    main()
